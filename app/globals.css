@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --color-background: #ffffff;
+  --color-foreground: #B09DD6;
+  --color-brand: #5B149C;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  caret-color: var(--color-brand);
+  accent-color: var(--color-brand);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+::selection {
+  background: var(--color-brand);
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Glass surfaces — chỉ dùng cho nút / điều khiển tương tác */
+.glass {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 10px 30px rgba(42, 18, 96, 0.12);
+}
+
+/* Section reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .animate-bounce {
+    animation: none;
+  }
+}
+
+@layer utilities {
+  /* Style tiêu đề báo chí / poster mạnh mẽ */
+  .editorial-title {
+    font-family: var(--font-archivo), "Archivo", sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    line-height: 0.95;
+  }
+
+  /* Khung lưới 3 cột kẹp header/footer giống Hero */
+  .editorial-grid-3col {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr 1fr;
+    align-items: start;
+    gap: 0.5rem;
+  }
+}
+
