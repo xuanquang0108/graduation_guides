@@ -36,7 +36,7 @@ export const EVENT = {
 export const MAP = {
   title: "Gửi xe ở đâu?",
   intro:
-    "Chọn một bãi xe gần Đại học Mở TP.HCM - Cơ sở 3, 97 Võ Văn Tần. Mở Google Maps để xem tuyến đường phù hợp tại thời điểm bạn đi.",
+    "Chọn một bãi xe gần Đại học Mở TP.HCM - Cơ sở 1, 97 Võ Văn Tần. Mở Google Maps để xem tuyến đường phù hợp tại thời điểm bạn đi.",
 };
 
 /* --------------------------------------------------------------------------

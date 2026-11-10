@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Map as MLMap, GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MAP } from "@/lib/site-config";
 import { Reveal } from "@/components/Reveal";
 import { MapPin } from "lucide-react";
 
@@ -23,16 +22,16 @@ const THEME = {
 };
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 
-const OU: LL = [10.7797, 106.6887]; // 97 Võ Văn Tần
+const OU: LL = [10.776367869404904, 106.69021655649846]; // 97 Võ Văn Tần
 const PARKINGS = {
-  cung: { short: "Cung VH Lao động", sub: "55B Nguyễn Thị Minh Khai", pos: [10.779, 106.693] as LL, color: "#5B149C" },
-  taodan: { short: "Công viên Tao Đàn", sub: "Trương Định", pos: [10.7745, 106.6925] as LL, color: "#5B149C" },
+  cung: { short: "Cung VH Lao động", sub: "55B Nguyễn Thị Minh Khai", pos: [10.776610986726107, 106.69223573697835] as LL, color: "#5B149C" },
+  taodan: { short: "Công viên Tao Đàn", sub: "Trương Định", pos: [10.775685006065105, 106.69221216698541] as LL, color: "#5B149C" },
 };
 type ParkingId = keyof typeof PARKINGS;
 
 const ORIGINS: { id: string; group: string; label: string; points: LL[] }[] = [
-  { id: "Cách mạng tháng 8-q10", group: "Cách mạng tháng 8", label: "Từ Quận 10 → ngã tư giao Nguyễn Thị Minh Khai", points: [[10.7733, 106.6797]] },
-  { id: "Cách mạng tháng 8-pd", group: "Cách mạng tháng 8", label: "Từ vòng xoay Phù Đổng → lên Nguyễn Thị Minh Khai", points: [[10.7735, 106.6975]] },
+  { id: "Cách mạng tháng 8-Q10", group: "Cách mạng tháng 8", label: "Từ Quận 10 → Nút giao với Nguyễn Thị Minh Khai", points: [[10.7733, 106.6797]] },
+  { id: "Cách mạng tháng 8-Q3", group: "Cách mạng tháng 8", label: "Từ vòng xoay Phù Đổng → lên Nguyễn Thị Minh Khai", points: [[10.7735, 106.6975]] },
   { id: "Nguyễn Thị Minh Khai-tn", group: "Nguyễn Thị Minh Khai", label: "Từ cầu Thị Nghè", points: [[10.7915, 106.7045]] },
   { id: "Nguyễn Thị Minh Khai-td", group: "Nguyễn Thị Minh Khai", label: "Từ BV Từ Dũ qua", points: [[10.7695, 106.6905]] },
   { id: "Võ Văn Tần-hcr", group: "Võ Văn Tần", label: "Từ Hồ Con Rùa ra", points: [[10.7812, 106.6925]] },
@@ -112,6 +111,13 @@ function applyBrandStyle(map: MLMap) {
 
 const isDev = process.env.NODE_ENV !== "production";
 
+async function geocode(q: string): Promise<{ label: string; pos: LL } | null> {
+  const r = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+  if (!r.ok) throw new Error(String(r.status));
+  const h = await r.json();
+  return h ? { label: h.label, pos: [h.lat, h.lng] } : null;
+}
+
 const DISPLAY = "font-display font-black uppercase leading-[0.95]";
 const EXPANDED = { fontStretch: "125%" } as const;
 
@@ -128,6 +134,7 @@ export function MapSection() {
   const [addrMsg, setAddrMsg] = useState("");
   const [pick, setPick] = useState(false);
   const [picked, setPicked] = useState("");
+  const [near, setNear] = useState(false);
 
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
@@ -144,6 +151,20 @@ export function MapSection() {
   const startPoints: LL[] = origin ? origin.points : [custom!.pos];
 
   useEffect(() => {
+    const node = el.current;
+    if (!node) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        setNear(true);
+        io.disconnect();
+      }
+    }, { rootMargin: "200px" });
+    io.observe(node);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!near) return;
     let disposed = false;
     (async () => {
       const maplibregl = await import("maplibre-gl");
@@ -207,7 +228,7 @@ export function MapSection() {
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [near]);
 
   useEffect(() => {
     const map = mapRef.current, ml = mlRef.current;
@@ -292,17 +313,13 @@ export function MapSection() {
     if (!q) return;
     setAddrMsg("Đang tìm địa chỉ…");
     try {
-      const u = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
-        format: "jsonv2", limit: "1", countrycodes: "vn", "accept-language": "vi",
-        viewbox: "106.45,11.05,106.95,10.55", q: /hồ chí minh|hcm|sài gòn/i.test(q) ? q : `${q}, Thành phố Hồ Chí Minh`,
-      })}`;
-      const res = await (await fetch(u)).json();
-      if (!res[0]) return setAddrMsg("Không tìm thấy địa chỉ này.");
-      setCustom({ label: res[0].display_name.split(",").slice(0, 2).join(","), pos: [parseFloat(res[0].lat), parseFloat(res[0].lon)] });
+      const hit = await geocode(q);
+      if (!hit) return setAddrMsg("Không tìm thấy địa chỉ này. Thử thêm tên đường hoặc quận.");
+      setCustom(hit);
       setOriginId("custom");
       setAddrMsg("");
     } catch {
-      setAddrMsg("Lỗi tìm địa chỉ.");
+      setAddrMsg("Không kết nối được dịch vụ tìm địa chỉ. Thử lại sau hoặc chọn điểm có sẵn.");
     }
   }
 
@@ -327,9 +344,9 @@ export function MapSection() {
   return (
       <section id="map" className="min-h-svh bg-white font-sans text-brand">
         <style>{`
-      .ou-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;transform:translateY(-6px)}
+      .ou-wrap{position:relative;width:46px;height:46px}
       .ou-pulse{width:46px;height:46px;border-radius:50%;background:#2A1260;border:3px solid #7335e8;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-stretch:125%;font-size:15px;animation:ouPulse 1.8s infinite}
-      .ou-label{background:#2A1260;color:#fff;font-weight:900;font-stretch:125%;text-transform:uppercase;letter-spacing:.02em;font-size:11px;padding:5px 10px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+      .ou-label{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#2A1260;color:#fff;font-weight:900;font-stretch:125%;text-transform:uppercase;letter-spacing:.02em;font-size:11px;padding:5px 10px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)}
       @keyframes ouPulse{0%{box-shadow:0 0 0 0 rgba(115,53,232,.75)}70%{box-shadow:0 0 0 20px rgba(115,53,232,0)}100%{box-shadow:0 0 0 0 rgba(115,53,232,0)}}
       .p-pin{width:30px;height:30px;border-radius:50%;color:#fff;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-stretch:125%;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
       .start-dot{width:18px;height:18px;border-radius:50%;background:#fff;border:5px solid #2A1260;box-shadow:0 0 0 4px rgba(42,18,96,.2)}
@@ -350,7 +367,7 @@ export function MapSection() {
           <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
             <Reveal className="min-w-0">
               <div className="relative overflow-hidden rounded-xl border border-lilac/30">
-                <div ref={el} className="h-[440px] w-full md:h-[580px]" />
+                <div ref={el} className="h-[440px] w-full md:h-[min(580px,70svh)]" />
                 {status === "loading" && (
                     <span className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1.5 font-sans text-[10px] font-semibold uppercase text-ink">
                 Đang tìm đường…

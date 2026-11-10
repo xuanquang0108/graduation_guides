@@ -2,7 +2,6 @@ import localFont from "next/font/local";
 import type { Metadata } from "next";
 import { Anton, Archivo, Inter } from "next/font/google";
 import "./globals.css";
-import { ScrollExperience } from "@/components/ScrollExperience";
 
 const novaQuinta = localFont({
     src: "../public/fonts/NovaQuinta.otf",
@@ -11,17 +10,18 @@ const novaQuinta = localFont({
 });
 
 const archivo = Archivo({
-    subsets: ["latin"],
+    subsets: ["latin", "vietnamese"],
+    axes: ["wdth"],
     variable: "--font-archivo",
 });
 
 const inter = Inter({
-    subsets: ["latin"],
+    subsets: ["latin", "vietnamese"],
     variable: "--font-inter",
 });
 
 const anton = Anton({
-    subsets: ["latin"],
+    subsets: ["latin", "vietnamese"],
     weight: "400",
     variable: "--font-anton",
 });
@@ -42,8 +42,7 @@ export default function RootLayout({
             className={`h-full antialiased ${archivo.variable} ${inter.variable} ${anton.variable} ${novaQuinta.variable}`}
         >
         <body className="flex min-h-full flex-col font-sans">
-            {children}
-            <ScrollExperience />
+        {children}
         </body>
         </html>
     );

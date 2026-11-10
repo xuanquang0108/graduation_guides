@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
 import styles from "./GraduationInvitation.module.css";
 
-/* ------------------------------ Types ------------------------------ */
-
 type Contact = { name: string; phone: string };
 
 type GraduationInvitationProps = {
@@ -23,38 +21,43 @@ type GraduationInvitationProps = {
     eventTime?: string;
     contacts?: Contact[];
 
-    /** Tự co chữ tiêu đề cho vừa khung (hữu ích khi đổi font). Mặc định: bật */
     fitHeadline?: boolean;
 
-    /** Đường dẫn ảnh trong /public, ví dụ "/images/panel.jpg". Bỏ trống = dùng màu + lưới mặc định */
     images?: {
-        outside?: string; // nền tím nhạt bên ngoài tem
-        paper?: string; // giấy viền tem
+        outside?: string;
+        paper?: string;
         panel?: string;
     };
 
-    /** Giá trị CSS font-family, ví dụ '"My Font", sans-serif' hoặc font.style.fontFamily của next/font */
     fonts?: { sans?: string; display?: string; script?: string };
 
-    /** Màu: bất kỳ giá trị CSS nào */
     colors?: {
         outside?: string;
         paper?: string;
         panel?: string;
-        ink?: string; // xanh ngọc: tiêu đề, ngày, chữ phụ
-        script?: string; // kem: chữ viết tay
-        accent?: string; // cam: tên người nhận
+        ink?: string;
+        script?: string;
+        accent?: string;
     };
 };
 
 type Vars = Record<`--${string}`, string | number>;
 const vars = (v: Vars) => v as CSSProperties;
 
+const SPARKLES: [number, number, number, number, string][] = [
+    [6, 3.5, 2.6, 1.4, "✦"],
+    [72, 3, 2, 2.2, "✧"],
+    [74, 30, 3.2, 0.6, "✦"],
+    [4, 38, 2, 3.1, "✧"],
+    [13, 62, 2.6, 2.0, "✦"],
+    [66, 63, 2.2, 3.6, "✧"],
+    [75, 44, 2, 1.7, "✧"],
+    [3, 46, 1.8, 2.7, "✦"],
+];
+
 const toCssUrl = (path?: string) =>
     path ? `url("${path.replace(/["\\]/g, "\\$&")}")` : "none";
 
-/* ----------------------------- Timeline ----------------------------- */
-// Mốc thời gian (ms) của lần xuất hiện đầu tiên. Chỉnh ở đây là xong.
 const T = {
     stamp: 0,
     head: 350,
@@ -66,11 +69,8 @@ const T = {
     foot: 3300,
 };
 
-/* ------------------------------ Hooks ------------------------------ */
-
 const SCRAMBLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-/** Chữ nhảy loạn rồi "chốt" dần từ trái sang phải. trigger = 0: chưa chạy. */
 function useScramble(text: string, trigger: number, delay: number, duration = 1000) {
     const [out, setOut] = useState(text);
 
@@ -97,7 +97,6 @@ function useScramble(text: string, trigger: number, delay: number, duration = 10
             if (p < 1) raf = requestAnimationFrame(tick);
             else setOut(text);
         };
-        // trước khi bắt đầu: hiện toàn chữ loạn để không bị "nháy" tên thật
         setOut(chars.map((c) => (c === " " ? c : SCRAMBLE[Math.floor(Math.random() * SCRAMBLE.length)])).join(""));
         const timer = window.setTimeout(() => (raf = requestAnimationFrame(tick)), delay);
         return () => {
@@ -109,9 +108,6 @@ function useScramble(text: string, trigger: number, delay: number, duration = 10
     return out;
 }
 
-/* ---------------------------- Sub-parts ---------------------------- */
-
-/** Tách từng ký tự để xuất hiện lần lượt + nhảy khi rê chuột. */
 function Chars({ text, start }: { text: string; start: number }) {
     return (
         <>
@@ -124,7 +120,6 @@ function Chars({ text, start }: { text: string; start: number }) {
     );
 }
 
-/** Số quay như đồng hồ công tơ mét, dừng lại ở đúng chữ số. */
 function Roll({ text, delay }: { text: string; delay: number }) {
     return (
         <span className={styles.roll} aria-hidden="true" style={vars({ "--d": `${delay}ms` })}>
@@ -153,8 +148,6 @@ function Roll({ text, delay }: { text: string; delay: number }) {
     );
 }
 
-/* --------------------------- Main component --------------------------- */
-
 export function GraduationInvitation({
                                          headline = ["LỄ", "TỐT", "NGHIỆP"],
                                          scriptTitle = "Uyên Như",
@@ -180,21 +173,19 @@ export function GraduationInvitation({
     const rootRef = useRef<HTMLDivElement>(null);
     const tiltRef = useRef<HTMLDivElement>(null);
     const headlineRef = useRef<HTMLHeadingElement>(null);
-    const [playing, setPlaying] = useState(false);
+    const [started, setStarted] = useState(false);
+    const [inView, setInView] = useState(false);
     const [run, setRun] = useState(0);
 
-    const scrambled = useScramble(recipient, playing ? run + 1 : 0, T.name, 1000);
+    const scrambled = useScramble(recipient, started ? run + 1 : 0, T.name, 1000);
 
-    // Chỉ chạy animation khi thiệp vào khung nhìn
     useEffect(() => {
         const el = rootRef.current;
         if (!el) return;
         const io = new IntersectionObserver(
             ([e]) => {
-                if (e.isIntersecting) {
-                    setPlaying(true);
-                    io.disconnect();
-                }
+                setInView(e.isIntersecting);
+                if (e.isIntersecting) setStarted(true);
             },
             { threshold: 0.4 },
         );
@@ -202,7 +193,6 @@ export function GraduationInvitation({
         return () => io.disconnect();
     }, []);
 
-    // Tự co tiêu đề cho vừa chiều ngang (đổi font xong không phải chỉnh tay)
     useEffect(() => {
         if (!fitHeadline) return;
         const h = headlineRef.current;
@@ -224,7 +214,6 @@ export function GraduationInvitation({
         };
     }, [fitHeadline, headline, run]);
 
-    // Nghiêng nhẹ theo chuột (chỉ chuột, không áp cho cảm ứng)
     const onMove = (e: PointerEvent<HTMLDivElement>) => {
         if (e.pointerType !== "mouse" || !tiltRef.current) return;
         const r = e.currentTarget.getBoundingClientRect();
@@ -245,7 +234,7 @@ export function GraduationInvitation({
         "--font-sans": fonts?.sans ?? 'Inter, "DM Sans", system-ui, sans-serif',
         "--font-display": fonts?.display ?? '"Teko", Impact, sans-serif',
         "--font-script": fonts?.script ?? '"Great Vibes", cursive',
-        "--c-outside": colors?.outside ?? "#9b86b9",
+        "--c-outside": colors?.outside ?? "#5b149c",
         "--c-paper": colors?.paper ?? "#f1f4e4",
         "--c-panel": colors?.panel ?? "#5a14a0",
         "--c-ink": colors?.ink ?? "#64cdc0",
@@ -256,11 +245,11 @@ export function GraduationInvitation({
     let charStart = 0;
 
     return (
-        <section className={styles.stage} style={cssVariables}>
+        <section id="invitation" className={styles.stage} style={cssVariables}>
             <div
                 ref={rootRef}
                 className={styles.poster}
-                data-play={playing}
+                data-play={started && inView}
                 data-panel={images?.panel ? "image" : "grid"}
                 aria-label="Thiệp mời lễ tốt nghiệp"
                 onPointerMove={onMove}
@@ -269,7 +258,7 @@ export function GraduationInvitation({
                 <div key={run} ref={tiltRef} className={styles.tilt}>
                     <article className={styles.ticket}>
                         <div className={styles.panel}>
-                            {/* Tiêu đề */}
+
                             <div className={styles.headlineWrap}>
                                 <h2
                                     ref={headlineRef}
@@ -289,7 +278,6 @@ export function GraduationInvitation({
                                 </h2>
                             </div>
 
-                            {/* Chữ viết tay: lướt ra như đang được viết */}
                             <p className={styles.script} style={vars({ "--d": `${T.script}ms` })}>
                                 <span className={styles.scriptInk}>{scriptTitle}</span>
                             </p>
@@ -298,7 +286,6 @@ export function GraduationInvitation({
                                 {greeting}
                             </p>
 
-                            {/* Tên người nhận: chữ nhảy loạn rồi chốt */}
                             <p className={styles.recipient} style={vars({ "--d": `${T.name}ms` })}>
                                 <span className={styles.scrWrap}>
                   <span className={styles.ghost}>{recipient}</span>
@@ -316,7 +303,6 @@ export function GraduationInvitation({
                                 ))}
                             </p>
 
-                            {/* Ngày: số quay như công tơ mét */}
                             <div
                                 className={styles.date}
                                 aria-label={`Ngày ${dateTop} năm ${dateBottom}`}
@@ -326,7 +312,6 @@ export function GraduationInvitation({
                                 <Roll text={dateBottom} delay={T.date + 250} />
                             </div>
 
-                            {/* Chân thiệp */}
                             <div className={styles.details}>
                                 <div className={styles.footerLeft} style={vars({ "--d": `${T.foot}ms` })}>
                                     <p className={styles.footerLabel}>
@@ -365,9 +350,16 @@ export function GraduationInvitation({
                                 </div>
                             </div>
 
-                            <span className={`${styles.sparkle} ${styles.sparkleOne}`} aria-hidden="true">✦</span>
-                            <span className={`${styles.sparkle} ${styles.sparkleTwo}`} aria-hidden="true">✦</span>
-                            <span className={`${styles.sparkle} ${styles.sparkleThree}`} aria-hidden="true">✧</span>
+                            {SPARKLES.map(([x, y, s, d, ch], i) => (
+                                <span
+                                    key={i}
+                                    className={styles.sparkle}
+                                    aria-hidden="true"
+                                    style={{ left: `${x}cqw`, top: `${y}cqw`, fontSize: `${s}cqw`, animationDelay: `${d}s` }}
+                                >
+                                    {ch}
+                                </span>
+                            ))}
                         </div>
                     </article>
                 </div>
