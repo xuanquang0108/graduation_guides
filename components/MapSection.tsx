@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MLMap, GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Reveal } from "@/components/Reveal";
-import { MapPin } from "lucide-react";
+import {MapPin, TriangleAlert} from "lucide-react";
 
 type LL = [number, number]; // [lat, lng]
 type C = [number, number]; // [lng, lat]
@@ -16,28 +16,18 @@ const THEME = {
   park: "#DDEFB0",
   building: "#E4DBF3",
   road: "#FFFFFF",
-  roadCasing: "#2a1260",
+  roadCasing: "#C1ADEE",
   text: "#2A1260",
   halo: "#fff",
 };
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 
-const OU: LL = [10.776367869404904, 106.69021655649846]; // 97 Võ Văn Tần
+const OU: LL = [10.776465731248422, 106.69023321954758]; // 97 Võ Văn Tần
 const PARKINGS = {
-  cung: { short: "Cung VH Lao động", sub: "55B Nguyễn Thị Minh Khai", pos: [10.776610986726107, 106.69223573697835] as LL, color: "#5B149C" },
-  taodan: { short: "Công viên Tao Đàn", sub: "Trương Định", pos: [10.775685006065105, 106.69221216698541] as LL, color: "#5B149C" },
+  cung: { short: "Cung Văn Hóa Lao động", sub: "55B Nguyễn Thị Minh Khai", pos: [10.776463595990528, 106.69208367284268] as LL, color: "#5B149C" },
+  taodan: { short: "Công viên Tao Đàn", sub: "Trương Định", pos: [10.775801734199018, 106.6922287830523] as LL, color: "#5B149C" },
 };
 type ParkingId = keyof typeof PARKINGS;
-
-const ORIGINS: { id: string; group: string; label: string; points: LL[] }[] = [
-  { id: "Cách mạng tháng 8-Q10", group: "Cách mạng tháng 8", label: "Từ Quận 10 → Nút giao với Nguyễn Thị Minh Khai", points: [[10.7733, 106.6797]] },
-  { id: "Cách mạng tháng 8-Q3", group: "Cách mạng tháng 8", label: "Từ vòng xoay Phù Đổng → lên Nguyễn Thị Minh Khai", points: [[10.7735, 106.6975]] },
-  { id: "Nguyễn Thị Minh Khai-tn", group: "Nguyễn Thị Minh Khai", label: "Từ cầu Thị Nghè", points: [[10.7915, 106.7045]] },
-  { id: "Nguyễn Thị Minh Khai-td", group: "Nguyễn Thị Minh Khai", label: "Từ BV Từ Dũ qua", points: [[10.7695, 106.6905]] },
-  { id: "Võ Văn Tần-hcr", group: "Võ Văn Tần", label: "Từ Hồ Con Rùa ra", points: [[10.7812, 106.6925]] },
-  { id: "Võ Văn Tần-Cách mạng tháng 8", group: "Võ Văn Tần", label: "Từ Cách mạng tháng 8 rẽ vào", points: [[10.779, 106.6882]] },
-];
-const GROUPS = ["Cách mạng tháng 8", "Nguyễn Thị Minh Khai", "Võ Văn Tần"];
 
 const toC = (p: LL): C => [p[1], p[0]];
 const rad = (x: number) => (x * Math.PI) / 180;
@@ -123,7 +113,6 @@ const EXPANDED = { fontStretch: "125%" } as const;
 
 export function MapSection() {
   const [parkingId, setParkingId] = useState<ParkingId>("cung");
-  const [originId, setOriginId] = useState(ORIGINS[0].id);
   const [custom, setCustom] = useState<{ label: string; pos: LL } | null>(null);
   const [steps, setSteps] = useState<{ text: string; dist: number }[]>([]);
   const [meta, setMeta] = useState<{ km: number; min: number } | null>(null);
@@ -147,8 +136,6 @@ export function MapSection() {
   pickRef.current = pick;
 
   const parking = PARKINGS[parkingId];
-  const origin = originId === "custom" && custom ? null : ORIGINS.find((o) => o.id === originId) ?? ORIGINS[0];
-  const startPoints: LL[] = origin ? origin.points : [custom!.pos];
 
   useEffect(() => {
     const node = el.current;
@@ -235,10 +222,22 @@ export function MapSection() {
     if (!ready || !map || !ml) return;
     const myToken = ++token.current;
     cancelAnimationFrame(raf.current);
+
+    if (!custom) {
+      (map.getSource("route") as GeoJSONSource).setData(EMPTY as any);
+      vehicleRef.current?.remove();
+      startRef.current?.remove();
+      setSteps([]);
+      setMeta(null);
+      setStatus("idle");
+      map.fitBounds(new ml.LngLatBounds(toC(OU), toC(OU)).extend(toC(parking.pos)), { padding: 90, pitch: 0, bearing: 0, maxZoom: 17, duration: 800 });
+      return;
+    }
+
     const ctrl = new AbortController();
     setStatus("loading");
 
-    const pts = [...startPoints, parking.pos];
+    const pts = [custom.pos, parking.pos];
     const url = `https://router.project-osrm.org/route/v1/driving/${pts.map((p) => `${p[1]},${p[0]}`).join(";")}?overview=full&geometries=geojson&steps=true`;
     const src = map.getSource("route") as GeoJSONSource;
     src.setData(EMPTY as any);
@@ -305,7 +304,7 @@ export function MapSection() {
         });
 
     return () => ctrl.abort();
-  }, [ready, originId, parkingId, custom, replay]);
+  }, [ready, parkingId, custom, replay]);
 
   async function submitAddress(e: React.FormEvent) {
     e.preventDefault();
@@ -316,7 +315,6 @@ export function MapSection() {
       const hit = await geocode(q);
       if (!hit) return setAddrMsg("Không tìm thấy địa chỉ này. Thử thêm tên đường hoặc quận.");
       setCustom(hit);
-      setOriginId("custom");
       setAddrMsg("");
     } catch {
       setAddrMsg("Không kết nối được dịch vụ tìm địa chỉ. Thử lại sau hoặc chọn điểm có sẵn.");
@@ -325,21 +323,19 @@ export function MapSection() {
 
   function useMyLocation() {
     if (!navigator.geolocation) return setAddrMsg("Trình duyệt không hỗ trợ định vị.");
-    setAddrMsg("Đang lấy vị trí…");
+    setAddrMsg("Đang lấy vị trí, chờ chút xíu…");
     navigator.geolocation.getCurrentPosition(
-        (g) => { setCustom({ label: "Vị trí của bạn", pos: [g.coords.latitude, g.coords.longitude] }); setOriginId("custom"); setAddrMsg(""); },
+        (g) => { setCustom({ label: "Vị trí của bạn", pos: [g.coords.latitude, g.coords.longitude] }); setAddrMsg(""); },
         () => setAddrMsg("Không lấy được vị trí."),
         { enableHighAccuracy: true, timeout: 10000 }
     );
   }
 
   const gmaps = `https://www.google.com/maps/dir/?${new URLSearchParams({
-    api: "1", origin: startPoints[0].join(","), destination: parking.pos.join(","), travelmode: "driving",
-    ...(startPoints.length > 1 ? { waypoints: startPoints.slice(1).map((p) => p.join(",")).join("|") } : {}),
+    api: "1", destination: parking.pos.join(","), travelmode: "driving",
+    ...(custom ? { origin: custom.pos.join(",") } : {}),
   })}`;
 
-  const chip = (on: boolean) =>
-      `rounded-lg border px-3 py-2 text-left font-sans text-xs font-semibold transition ${on ? "border-brand bg-brand text-white" : "border-hero bg-white text-brand"}`;
 
   return (
       <section id="map" className="min-h-svh bg-white font-sans text-brand">
@@ -383,6 +379,10 @@ export function MapSection() {
                 </div>
                 {isDev && pick && picked && <span className="absolute bottom-3 left-3 z-10 rounded-md bg-ink px-3 py-1.5 font-mono text-xs text-signal">{picked} (đã copy)</span>}
               </div>
+
+              <span className="mt-4 flex gap-2">
+                <TriangleAlert className="size-5 text-brand"/>
+                <p className="text-sm italic">Khu vực quanh trường đang thi công; lộ trình có thể thay đổi, bạn nhớ chú ý biển báo và cập nhật bản đồ nhé!</p></span>
             </Reveal>
 
             <Reveal delay={120} className="flex min-w-0 flex-col gap-4">
@@ -411,15 +411,23 @@ export function MapSection() {
                   </button>
                   {addrMsg && <p className="font-sans text-xs text-brand/80">{addrMsg}</p>}
                   {custom && (
-                      <button type="button" onClick={() => setOriginId("custom")} className={`${chip(originId === "custom")} inline-flex items-center gap-1.5`}>
+                      <div className="flex items-center gap-2 rounded-lg border border-brand bg-brand px-3 py-2 font-sans text-xs font-bold text-white">
                         <MapPin className="size-4 shrink-0" />
-                        <span>{custom.label}</span>
-                      </button>
+                        <span className="min-w-0 flex-1">{custom.label}</span>
+                        <button type="button" aria-label="Bỏ điểm xuất phát" onClick={() => setCustom(null)} className="shrink-0 px-1 hover:opacity-80">✕</button>
+                      </div>
                   )}
                 </div>
               </form>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2">
+                <label
+                    htmlFor="addr"
+                    className={`${DISPLAY} text-[clamp(9px,1.3vw,13px)] text-brand mt-2`}
+                    style={EXPANDED}
+                >
+                  Bạn muốn đến bãi giữ xe nào?
+                </label>
                 {(Object.keys(PARKINGS) as ParkingId[]).map((id) => (
                     <button
                         key={id}
@@ -442,33 +450,18 @@ export function MapSection() {
                 ))}
               </div>
 
-              <div className="space-y-3">
-                {GROUPS.map((g) => (
-                    <div key={g}>
-                      <p className={`${DISPLAY} mb-1.5 text-[10px] text-brand`} style={EXPANDED}>
-                        Đường {g}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {ORIGINS.filter((o) => o.group === g).map((o) => (
-                            <button key={o.id} type="button" aria-pressed={originId === o.id} onClick={() => setOriginId(o.id)} className={chip(originId === o.id)}>
-                              {o.label}
-                            </button>
-                        ))}
-                      </div>
-                    </div>
-                ))}
-              </div>
-
               <div className="rounded-xl border border-brand/15 bg-brand/10 p-5">
                 {meta && (
                     <p className={`${DISPLAY} mb-3 text-[11px] text-brand/70`} style={EXPANDED}>
                       {meta.km.toFixed(1)} km · khoảng {meta.min} phút
                     </p>
                 )}
+                {!custom && <p className="font-sans text-sm leading-relaxed text-brand/80">Nhập địa chỉ hoặc dùng vị trí hiện tại để xem đường đi tới bãi xe.</p>}
+                {status === "error" && <p className="font-sans text-sm text-brand/80">Chưa vẽ được tuyến. Thử địa chỉ khác.</p>}
                 <ol className="max-h-56 space-y-2.5 overflow-y-auto pr-1">
                   {steps.map((s, i) => (
                       <li key={i} className="flex gap-3 font-sans text-sm leading-relaxed text-brand/90">
-                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal font-display text-xs font-black text-ink" style={EXPANDED}>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-hero font-display text-xs font-black text-white" style={EXPANDED}>
                     {i + 1}
                   </span>
                         <span>

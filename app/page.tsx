@@ -2,6 +2,7 @@ import { HeroSection } from "@/components/HeroSection";
 import { MapSection } from "@/components/MapSection";
 import { GraduationInvitation } from "@/components/GraduationInvitation";
 import { SideNav } from "@/components/SideNav";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export default function Home() {
     return (
@@ -22,6 +23,7 @@ export default function Home() {
                 }}
             />
             <MapSection />
+            <SiteFooter/>
         </main>
     );
 }

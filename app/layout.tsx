@@ -27,7 +27,7 @@ const anton = Anton({
 });
 
 export const metadata: Metadata = {
-    title: "Uyên Như — Lễ tốt nghiệp 2026",
+    title: "Uyên Như",
     description: "Tốt nghiệp của Uyên Như.",
 };
 
